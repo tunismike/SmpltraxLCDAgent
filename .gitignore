@@ -1,6 +1,7 @@
 # Local R runtime and vendored packages (large)
 R-4.5.1/
 libs/
+r-miniconda/
 
 # Logs and temp outputs
 *.log

@@ -1,32 +1,46 @@
 # ---- Smpltrax LCD Agent (Shimadzu .LCD -> per-sample CSV with metadata) ----
 
+# Locate the script and repo root (works on Windows/macOS/Linux)
+script_dir <- normalizePath({
+  ca <- commandArgs()
+  f  <- if (any(grepl("^--file=", ca))) sub("^--file=", "", ca[grep("^--file=", ca)][1]) else ""
+  if (nzchar(f)) dirname(f) else getwd()
+}, winslash = "/")
+root_dir <- normalizePath(file.path(script_dir, ".."), winslash = "/")
+
 suppressPackageStartupMessages({
-  # Put the portable libs (../libs) first so this runs offline
-  .libPaths(c(
-    normalizePath(file.path({
-      ca <- commandArgs()
-      f  <- if (any(grepl("^--file=", ca))) sub("^--file=", "", ca[grep("^--file=", ca)][1]) else ""
-      if (nzchar(f)) dirname(f) else getwd()
-    }, "..", "libs"), winslash = "/"),
-    .libPaths()
-  ))
+  # Prefer local libs/ if present so this can run offline
+  .libPaths(c(file.path(root_dir, "libs"), .libPaths()))
   library(yaml)
   library(digest)
 })
 
 # --- Reticulate: bind chromConverter to the Miniconda env you set up ---
-Sys.setenv(
-  RETICULATE_MINICONDA_PATH = "C:/SmpltraxLCDAgent/r-miniconda",
-  RETICULATE_PYTHON         = "C:/SmpltraxLCDAgent/r-miniconda/envs/r-reticulate/python.exe",
-  RETICULATE_PYTHON_FALLBACK = "0",
-  CONDARC                   = "C:/SmpltraxLCDAgent/r-miniconda/.condarc",
-  CONDA_OVERRIDE_CHANNELS   = "1"
-)
+# Use repo-relative defaults; fall back to system reticulate config if missing.
+miniconda_path <- normalizePath(file.path(root_dir, "r-miniconda"), winslash = "/", mustWork = FALSE)
+py_bin <- if (.Platform$OS.type == "windows") {
+  file.path(miniconda_path, "envs", "r-reticulate", "python.exe")
+} else {
+  file.path(miniconda_path, "envs", "r-reticulate", "bin", "python")
+}
+
+if (dir.exists(miniconda_path)) {
+  Sys.setenv(
+    RETICULATE_MINICONDA_PATH = miniconda_path,
+    CONDARC                   = file.path(miniconda_path, ".condarc"),
+    CONDA_OVERRIDE_CHANNELS   = "1",
+    RETICULATE_PYTHON_FALLBACK = "0"
+  )
+  if (file.exists(py_bin)) Sys.setenv(RETICULATE_PYTHON = py_bin)
+}
 Sys.unsetenv("VIRTUAL_ENV")
 
 suppressPackageStartupMessages({
   library(reticulate)
-  try(use_python(Sys.getenv("RETICULATE_PYTHON"), required = FALSE), silent = TRUE)
+  # If a specific Python was provided, prefer it; otherwise let reticulate choose.
+  if (nzchar(Sys.getenv("RETICULATE_PYTHON"))) {
+    try(use_python(Sys.getenv("RETICULATE_PYTHON"), required = FALSE), silent = TRUE)
+  }
   if (py_available(initialize = FALSE) && !py_module_available("olefile")) {
     try(py_install("olefile", pip = TRUE), silent = TRUE)
   }
@@ -53,20 +67,21 @@ first_nonempty <- function(x) {
 }
 
 # ---------------------- Resolve paths, load config ----------------------------
-script_dir <- normalizePath({
-  ca <- commandArgs()
-  f  <- if (any(grepl("^--file=", ca))) sub("^--file=", "", ca[grep("^--file=", ca)][1]) else ""
-  if (nzchar(f)) dirname(f) else getwd()
-}, winslash = "/")
-
 cfg <- yaml::read_yaml(file.path(script_dir, "config.yaml"))
+
+resolve_path <- function(p) {
+  if (!length(p) || is.null(p) || is.na(p)) return(NA_character_)
+  # Absolute if starts with drive, /, or ~
+  is_abs <- grepl("^[A-Za-z]:|^/|^~", p)
+  normalizePath(ifelse(is_abs, p, file.path(root_dir, p)), winslash = "/", mustWork = FALSE)
+}
 
 LAB_ID      <- cfg$lab_id %||% ""
 PANEL_TYPE  <- toupper(cfg$panel_type %||% "AUTO")
-INPUT_DIRS  <- as.character(cfg$input_dirs %||% character(0))
+INPUT_DIRS  <- resolve_path(as.character(cfg$input_dirs %||% character(0)))
 RECURSIVE   <- isTRUE(cfg$recursive)
 PATTERN     <- cfg$file_glob %||% "*.lcd"
-OUTPUT_ROOT <- cfg$output_root %||% file.path(script_dir, "..", "exports")
+OUTPUT_ROOT <- resolve_path(cfg$output_root %||% file.path(root_dir, "data", "Smpltrax", "Exports"))
 AGE_MIN     <- as.numeric(cfg$min_file_age_minutes %||% 2)
 STABLE_WAIT <- as.numeric(cfg$stable_wait_seconds %||% 5)
 

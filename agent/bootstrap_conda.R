@@ -1,23 +1,27 @@
-# ----- Bootstrap Python for chromConverter (Windows, portable) -----
-.libPaths("C:/Users/Mike Tunis/Documents/SmpltraxLCDAgent/libs")
-Sys.setenv(RETICULATE_MINICONDA_PATH = "C:/SmpltraxLCDAgent/r-miniconda")
+# ----- Bootstrap Python for chromConverter (cross-platform) -----
+
+script_dir <- normalizePath({
+  ca <- commandArgs()
+  f  <- if (any(grepl("^--file=", ca))) sub("^--file=", "", ca[grep("^--file=", ca)][1]) else ""
+  if (nzchar(f)) dirname(f) else getwd()
+}, winslash = "/")
+root_dir <- normalizePath(file.path(script_dir, ".."), winslash = "/")
+lib_dir  <- file.path(root_dir, "libs")
+mini     <- file.path(root_dir, "r-miniconda")
+
+.libPaths(c(lib_dir, .libPaths()))
+Sys.setenv(RETICULATE_MINICONDA_PATH = mini)
 
 suppressPackageStartupMessages(library(reticulate))
 
-mini <- Sys.getenv("RETICULATE_MINICONDA_PATH")
-conda_bat <- file.path(mini, "condabin", "conda.bat")
-condarc   <- file.path(mini, ".condarc")
-
-# 1) Ensure Miniconda exists
-if (!file.exists(conda_bat)) {
+# 1) Ensure Miniconda exists at the repo-relative path
+if (!dir.exists(mini)) {
   message(">> Installing Miniconda to: ", mini)
   install_miniconda(path = mini, force = TRUE)
-  conda_bat <- file.path(mini, "condabin", "conda.bat")
 }
 
-if (!file.exists(conda_bat)) stop("conda.bat not found at: ", conda_bat)
-
-# 2) Force conda-forge only by writing a local .condarc and pointing CONDARC at it
+# 2) Force conda-forge only by writing a local .condarc
+condarc <- file.path(mini, ".condarc")
 condarc_txt <- paste(
   "channels:",
   "  - conda-forge",
@@ -27,15 +31,10 @@ condarc_txt <- paste(
   sep = "\n"
 )
 writeLines(condarc_txt, condarc)
-Sys.setenv(CONDARC = condarc)            # make conda read THIS config
-Sys.setenv(CONDA_OVERRIDE_CHANNELS = "1")# ignore defaults/other sources
-
-message(">> Using CONDARC at: ", condarc)
-# (Optional) Show where config comes from:
-# system2(conda_bat, c("config","--show-sources"))
+Sys.setenv(CONDARC = condarc, CONDA_OVERRIDE_CHANNELS = "1")
 
 # 3) Create env if missing (from conda-forge only)
-message(">> Checking/creating env: r-reticulate …")
+message(">> Checking/creating env: r-reticulate")
 envs <- tryCatch(conda_list(), error = function(e) data.frame(name = character()))
 if (!("r-reticulate" %in% envs$name)) {
   conda_create("r-reticulate", packages = "python", channel = "conda-forge")

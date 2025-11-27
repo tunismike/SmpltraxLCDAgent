@@ -1,9 +1,12 @@
 lab_id: '3000'
 panel_type: CAN
+
+# Paths are relative to the repo root by default
 input_dirs:
-- C:/LabSolutions/Data
+  - ../data/LabSolutions/Data
 recursive: yes
 file_glob: '*.lcd'
-output_root: C:/Smpltrax/Exports
+output_root: ../data/Smpltrax/Exports
+
 min_file_age_minutes: 2.0
 stable_wait_seconds: 5.0
