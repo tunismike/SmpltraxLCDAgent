@@ -1,0 +1,23 @@
+# Local R runtime and vendored packages (large)
+R-4.5.1/
+libs/
+
+# Logs and temp outputs
+*.log
+
+# R session/user files
+.Rhistory
+.RData
+.Rproj.user/
+.Rprofile
+.Renviron
+.Ruserdata
+
+# Common editor/OS cruft
+.DS_Store
+Thumbs.db
+
+# Python/venv artifacts
+__pycache__/
+.env
+venv/
