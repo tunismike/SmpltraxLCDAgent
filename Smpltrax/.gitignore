@@ -1,8 +1,0 @@
-# OS/editor cruft
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Logs
-*.log
-!Exports/*.log
