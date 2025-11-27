@@ -5,7 +5,7 @@ libs/
 # Logs and temp outputs
 *.log
 # Keep Smpltrax export logs
-!Smpltrax/Exports/*.log
+!data/Smpltrax/Exports/*.log
 
 # R session/user files
 .Rhistory
